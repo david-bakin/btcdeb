@@ -111,9 +111,12 @@ int main(int argc, char* const* argv)
 {
     ECC_Start();
 
+    bool force_verbose = !!std::getenv("DEBUG_FORCE_VERBOSE");
+
     pipe_in = !isatty(fileno(stdin)) || std::getenv("DEBUG_SET_PIPE_IN");
     pipe_out = !isatty(fileno(stdout)) || std::getenv("DEBUG_SET_PIPE_OUT");
-    if (pipe_in || pipe_out) btc_logf = btc_logf_dummy;
+    if (!force_verbose)
+        if (pipe_in || pipe_out) btc_logf = btc_logf_dummy;
 
     cliargs ca;
     ca.add_option("help", 'h', no_arg);
@@ -125,7 +128,7 @@ int main(int argc, char* const* argv)
     ca.add_option("privkey", 'k', req_arg);
     ca.add_option("sig", 's', req_arg);
     ca.parse(argc, argv);
-    quiet = ca.m.count('q') || pipe_in || pipe_out;
+    quiet = !force_verbose ? (ca.m.count('q') || pipe_in || pipe_out) : false;
     if (quiet) btc_logf = btc_logf_dummy;
 
     if (ca.m.count('v')) {
@@ -141,12 +144,12 @@ int main(int argc, char* const* argv)
         fprintf(stderr, "The address prefix refers to the bech32m human readable part; this defaults to '%s'\n", DEFAULT_ADDR_PREFIX);
         return 0;
     }
-    btc_logf("tap " VERSION() " -- type `%s -h` for help\n", argv[0]);
+    btc_logf("tap " VERSION() "(DSB) -- type `%s -h` for help\n", argv[0]);
     fprintf(stderr, "WARNING: This is experimental software. Do not use this with real bitcoin, or you will most likely lose them all. You have been w a r n e d.\n");
 
     if (!pipe_in) {
         // temporarily defaulting all to ON
-        if (checkenv("DEBUG_SIGHASH")) btc_sighash_logf = btc_logf_stderr;
+        if (checkenv("DEBUG_SIGHASH", true)) btc_sighash_logf = btc_logf_stderr;
         if (checkenv("DEBUG_SIGNING", true)) btc_sign_logf = btc_logf_stderr;
         if (checkenv("DEBUG_SEGWIT", true))  btc_segwit_logf = btc_logf_stderr;
         if (checkenv("DEBUG_TAPROOT", true)) btc_taproot_logf = btc_logf_stderr;
@@ -155,6 +158,7 @@ int main(int argc, char* const* argv)
         if (btc_enabled(btc_sign_logf)) btc_logf(" sign");
         if (btc_enabled(btc_segwit_logf)) btc_logf(" segwit");
         if (btc_enabled(btc_taproot_logf)) btc_logf(" taproot");
+        if (force_verbose) btc_logf(" force-verbose");
         btc_logf("\n");
     }
 
